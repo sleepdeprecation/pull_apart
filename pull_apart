@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+from PIL import Image, ImageColor, ImageChops
+from argparse import ArgumentParser
+
+colors = {
+    "R": ImageColor.getrgb("#f00"),
+    "G": ImageColor.getrgb("#0f0"),
+    "B": ImageColor.getrgb("#00f"),
+}
+
+def pull_apart(original, offset_percent = 0.02, order = "RGB"):
+    offset_x = int(original.width * offset_percent)
+    offset_y = int(original.height * offset_percent)
+
+    filtered_images = []
+    for index, color in enumerate(order):
+        channel = original.getchannel(color)
+        full = Image.new("RGB", original.size, color=colors[color])
+
+        offset_coords = (-offset_x + (offset_x * index), -offset_y + (offset_y * index))
+        offset = Image.new("RGB", original.size, color=ImageColor.getrgb("#fff"))
+        offset.paste(channel, box=offset_coords)
+
+        single_channel = ImageChops.multiply(offset, full)
+        filtered_images.append(single_channel)
+
+    first = ImageChops.screen(filtered_images[0], filtered_images[1])
+    second = ImageChops.screen(first, filtered_images[2])
+
+    return second.crop((
+        offset_x,
+        offset_y,
+        original.width - offset_x,
+        original.height - offset_y,
+    ))
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        description = "Create a 'pull apart' version of an image"
+    )
+
+    parser.add_argument("input", help="Image to 'pull apart'")
+    parser.add_argument("output", help="Name of output file")
+    parser.add_argument("--offset", "-p", help="Percent offset between each color layer", default = 0.02, type=float)
+    parser.add_argument("--order", "-o", help="Order of layers (using R, G, and B)", default = "RGB")
+
+    args = parser.parse_args()
+    original = Image.open(args.input)
+    pull_apart(original, offset_percent=args.offset, order=args.order).save(args.output)
